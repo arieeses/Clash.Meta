@@ -38,8 +38,9 @@ type LuluTLSOption struct {
 	Path           string `proxy:"path,omitempty"`         // WS path / routing prefix
 	Cipher         string `proxy:"cipher,omitempty"`       // aes | xchacha | chacha
 	Shape          string `proxy:"shape,omitempty"`        // off | lite | balanced | paranoid
-	Fingerprint    string `proxy:"fingerprint,omitempty"`  // chrome | firefox
+	Fingerprint    string `proxy:"fp,omitempty"`           // chrome | firefox (panel emits "fp")
 	Codec          string `proxy:"lane-c-codec,omitempty"` // basen | arith (lane C)
+	Cover          string `proxy:"cover,omitempty"`        // server-side cover origin; carried in the sub, unused by the client
 	UDP            bool   `proxy:"udp,omitempty"`
 	SkipCertVerify bool   `proxy:"skip-cert-verify,omitempty"`
 }

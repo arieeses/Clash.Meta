@@ -347,7 +347,7 @@ func TestConvertsV2RayLuluTLS(t *testing.T) {
 			"path":             "/cdn/app.js",
 			"cipher":           "aes",
 			"shape":            "balanced",
-			"fingerprint":      "chrome",
+			"fp":               "chrome",
 			"lane-c-codec":     "basen",
 			"skip-cert-verify": true,
 		},

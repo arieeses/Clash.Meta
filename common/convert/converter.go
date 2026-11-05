@@ -761,7 +761,7 @@ func ConvertsV2Ray(buf []byte) ([]map[string]any, error) {
 				lulutls["shape"] = v
 			}
 			if v := query.Get("tls-fingerprint"); v != "" {
-				lulutls["fingerprint"] = v
+				lulutls["fp"] = v
 			}
 			if v := query.Get("lane-c-codec"); v != "" {
 				lulutls["lane-c-codec"] = v
