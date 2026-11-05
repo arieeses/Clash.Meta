@@ -706,6 +706,71 @@ func ConvertsV2Ray(buf []byte) ([]map[string]any, error) {
 
 				proxies = append(proxies, mieru)
 			}
+		case "lulutls":
+			// lulutls://<psk-hex>@host:port?lane=&shape=&cipher=&node-key=&sni=&path=&tls-fingerprint=&lane-c-codec=&insecure=#name
+			urlLulu, err := url.Parse(line)
+			if err != nil {
+				continue
+			}
+			server := urlLulu.Hostname()
+			portStr := urlLulu.Port()
+			if server == "" || portStr == "" {
+				continue
+			}
+			port, err := strconv.Atoi(portStr)
+			if err != nil {
+				continue
+			}
+			psk := ""
+			if urlLulu.User != nil {
+				psk = urlLulu.User.Username()
+			}
+			if psk == "" {
+				continue
+			}
+			query := urlLulu.Query()
+			baseName := urlLulu.Fragment
+			if baseName == "" {
+				baseName = server
+			}
+			name := uniqueName(names, baseName)
+
+			lulutls := make(map[string]any, 15)
+			lulutls["name"] = name
+			lulutls["type"] = scheme
+			lulutls["server"] = server
+			lulutls["port"] = port
+			lulutls["psk"] = psk
+			lulutls["udp"] = true
+			if v := query.Get("node-key"); v != "" {
+				lulutls["node-key"] = v
+			}
+			if v := query.Get("lane"); v != "" {
+				lulutls["lane"] = v
+			}
+			if v := query.Get("sni"); v != "" {
+				lulutls["sni"] = v
+			}
+			if v := query.Get("path"); v != "" {
+				lulutls["path"] = v
+			}
+			if v := query.Get("cipher"); v != "" {
+				lulutls["cipher"] = v
+			}
+			if v := query.Get("shape"); v != "" {
+				lulutls["shape"] = v
+			}
+			if v := query.Get("tls-fingerprint"); v != "" {
+				lulutls["fingerprint"] = v
+			}
+			if v := query.Get("lane-c-codec"); v != "" {
+				lulutls["lane-c-codec"] = v
+			}
+			if v := query.Get("insecure"); v == "1" || strings.EqualFold(v, "true") {
+				lulutls["skip-cert-verify"] = true
+			}
+
+			proxies = append(proxies, lulutls)
 		}
 	}
 

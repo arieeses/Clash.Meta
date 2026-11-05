@@ -329,3 +329,48 @@ func TestConvertsV2RayVmessBase64HTTPRemappedToH2Transport(t *testing.T) {
 	_, err = adapter.ParseProxy(proxies[0])
 	assert.NoError(t, err)
 }
+
+func TestConvertsV2RayLuluTLS(t *testing.T) {
+	link := "lulutls://00112233445566778899aabbccddeeff@example.com:8443?lane=ws&sni=www.example.com&path=/cdn/app.js&cipher=aes&shape=balanced&node-key=node-secret&tls-fingerprint=chrome&lane-c-codec=basen&insecure=1#mynode"
+
+	expected := []map[string]interface{}{
+		{
+			"name":             "mynode",
+			"type":             "lulutls",
+			"server":           "example.com",
+			"port":             8443,
+			"psk":              "00112233445566778899aabbccddeeff",
+			"udp":              true,
+			"node-key":         "node-secret",
+			"lane":             "ws",
+			"sni":              "www.example.com",
+			"path":             "/cdn/app.js",
+			"cipher":           "aes",
+			"shape":            "balanced",
+			"fingerprint":      "chrome",
+			"lane-c-codec":     "basen",
+			"skip-cert-verify": true,
+		},
+	}
+
+	proxies, err := ConvertsV2Ray([]byte(link))
+	assert.Nil(t, err)
+	assert.Equal(t, expected, proxies)
+
+	// The converted map must build a working adapter.
+	_, err = adapter.ParseProxy(proxies[0])
+	assert.Nil(t, err)
+}
+
+func TestConvertsV2RayLuluTLSMinimal(t *testing.T) {
+	// Only the required fields; everything else defaults inside the adapter.
+	link := "lulutls://deadbeef@1.2.3.4:443#n"
+	proxies, err := ConvertsV2Ray([]byte(link))
+	assert.Nil(t, err)
+	assert.Len(t, proxies, 1)
+	assert.Equal(t, "lulutls", proxies[0]["type"])
+	assert.Equal(t, 443, proxies[0]["port"])
+	assert.Equal(t, "deadbeef", proxies[0]["psk"])
+	_, err = adapter.ParseProxy(proxies[0])
+	assert.Nil(t, err)
+}

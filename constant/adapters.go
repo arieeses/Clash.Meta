@@ -55,6 +55,7 @@ const (
 	ZeroTier
 	EasyTier
 	GostRelay
+	LuluTLS
 )
 
 const (
@@ -243,6 +244,8 @@ func (at AdapterType) String() string {
 		return "EasyTier"
 	case GostRelay:
 		return "GostRelay"
+	case LuluTLS:
+		return "LuluTLS"
 	case Relay:
 		return "Relay"
 	case Selector:
