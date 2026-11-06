@@ -208,3 +208,77 @@ func startUDPEcho(t *testing.T) string {
 	}()
 	return uc.LocalAddr().String()
 }
+
+// TestLuluTLSAdapterLaneGWebRTC drives the real LuluTLS adapter over lane G
+// (WebRTC-media) against a local engine webrtc server + TCP echo upstream,
+// proving the pion/webrtc carrier round-trips through the shipping adapter.
+func TestLuluTLSAdapterLaneGWebRTC(t *testing.T) {
+	nodeKey := "engine-laneG-node-key-abc"
+	userPSK := []byte("engine-laneG-user-psk-123")
+	tcpEcho := startTCPEcho(t)
+
+	h := func(user string, network byte, addr string, remote net.Addr, st io.ReadWriteCloser) {
+		defer st.Close()
+		if network != engine.NetTCP {
+			return
+		}
+		up, err := net.Dial("tcp", addr)
+		if err != nil {
+			return
+		}
+		defer up.Close()
+		go io.Copy(up, st)
+		io.Copy(st, up)
+	}
+
+	srv, err := engine.New(engine.Config{Lane: "webrtc", Listen: "127.0.0.1:0", NodeKey: []byte(nodeKey)}, h)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	srv.SetUsers([]engine.User{{Name: "u1", PSK: userPSK}})
+	if err := srv.Start(); err != nil {
+		t.Fatalf("engine.Start: %v", err)
+	}
+	defer srv.Close()
+	ua, ok := srv.Addr().(*net.UDPAddr)
+	if !ok {
+		t.Fatalf("lane G: expected UDP addr, got %T", srv.Addr())
+	}
+
+	proxy, err := NewLuluTLS(LuluTLSOption{
+		Name:    "lulu-laneG",
+		Server:  "127.0.0.1",
+		Port:    ua.Port,
+		PSK:     hex.EncodeToString(userPSK),
+		NodeKey: nodeKey,
+		Lane:    "webrtc",
+	})
+	if err != nil {
+		t.Fatalf("NewLuluTLS: %v", err)
+	}
+	defer proxy.Close()
+
+	eHost, ePortStr, _ := net.SplitHostPort(tcpEcho)
+	ePort, _ := strconv.Atoi(ePortStr)
+	md := &C.Metadata{NetWork: C.TCP, Host: eHost, DstPort: uint16(ePort)}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
+	c, err := proxy.DialContext(ctx, md)
+	if err != nil {
+		t.Fatalf("DialContext (lane G): %v", err)
+	}
+	defer c.Close()
+
+	msg := []byte("lulutls-adapter-laneG-roundtrip")
+	if _, err := c.Write(msg); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	got := make([]byte, len(msg))
+	if _, err := io.ReadFull(c, got); err != nil {
+		t.Fatalf("read echo: %v", err)
+	}
+	if string(got) != string(msg) {
+		t.Fatalf("lane G echo mismatch: got %q want %q", got, msg)
+	}
+}
