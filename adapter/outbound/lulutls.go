@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/netip"
 	"strconv"
 
 	N "github.com/metacubex/mihomo/common/net"
@@ -145,6 +146,13 @@ func NewLuluTLS(option LuluTLSOption) (*LuluTLS, error) {
 		// (escapes the TUN capture loop) and honours interface / routing-mark.
 		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
 			return outbound.dialer.DialContext(ctx, network, address)
+		},
+		// UDP lanes (quic/webrtc) get their socket from mihomo's dialer too, so
+		// it carries DefaultSocketHook (VpnService.protect) and is excluded from
+		// the TUN — otherwise quic-go/pion open their own raw socket and loop.
+		ListenPacket: func(ctx context.Context) (net.PacketConn, error) {
+			rAddrPort, _ := netip.ParseAddrPort(addr) // zero if server is a domain; protect still applies
+			return outbound.dialer.ListenPacket(ctx, "udp", "", rAddrPort)
 		},
 	}
 	client, err := luluclient.NewDialer(cfg)
