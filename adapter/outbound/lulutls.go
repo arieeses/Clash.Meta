@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/netip"
 	"strconv"
+	"sync"
 
 	N "github.com/metacubex/mihomo/common/net"
 	C "github.com/metacubex/mihomo/constant"
@@ -168,6 +169,8 @@ func NewLuluTLS(option LuluTLSOption) (*LuluTLS, error) {
 type luluPacketConn struct {
 	net.Conn
 	target net.Addr
+	rMu    sync.Mutex // serializes the 2-step framed read (hdr + payload) across concurrent ReadFrom
+	wMu    sync.Mutex // serializes the framed write across concurrent WriteTo
 }
 
 func (pc *luluPacketConn) WriteTo(p []byte, _ net.Addr) (int, error) {
@@ -177,13 +180,24 @@ func (pc *luluPacketConn) WriteTo(p []byte, _ net.Addr) (int, error) {
 	buf := make([]byte, 2+len(p))
 	binary.BigEndian.PutUint16(buf[:2], uint16(len(p)))
 	copy(buf[2:], p)
-	if _, err := pc.Conn.Write(buf); err != nil {
+	// net.PacketConn allows concurrent WriteTo; keep each framed datagram
+	// (2-byte length prefix + payload) atomic on the wire so frames never interleave.
+	pc.wMu.Lock()
+	_, err := pc.Conn.Write(buf)
+	pc.wMu.Unlock()
+	if err != nil {
 		return 0, err
 	}
 	return len(p), nil
 }
 
 func (pc *luluPacketConn) ReadFrom(p []byte) (int, net.Addr, error) {
+	// net.PacketConn allows concurrent ReadFrom (pion ICE/DTLS/SCTP do this).
+	// The read is two non-atomic steps (length prefix, then payload); without
+	// serialization concurrent readers desync the framing and hand garbage/oversized
+	// lengths to the caller, which corrupts memory. Hold rMu for the whole frame.
+	pc.rMu.Lock()
+	defer pc.rMu.Unlock()
 	var hdr [2]byte
 	if _, err := io.ReadFull(pc.Conn, hdr[:]); err != nil {
 		return 0, nil, err
