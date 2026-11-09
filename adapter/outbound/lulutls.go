@@ -42,6 +42,11 @@ type LuluTLSOption struct {
 	Shape          string `proxy:"shape,omitempty"`        // off | lite | balanced | paranoid
 	Fingerprint    string `proxy:"fp,omitempty"`           // chrome | firefox (panel emits "fp")
 	Codec          string `proxy:"lane-c-codec,omitempty"` // basen | arith (lane C)
+	NoMux          bool   `proxy:"nomux,omitempty"`        // legacy: skip mux (= mux "off"); prefer Mux
+	Mux            string `proxy:"mux,omitempty"`          // off | low | mid | high (mieru-style session pool)
+	Window         int    `proxy:"window,omitempty"`       // per-stream recv window KiB (0 => adaptive); mux mode
+	FrameSize      int    `proxy:"frame,omitempty"`        // send-side frame size KiB (0 => 16); larger = fewer syscalls
+	Media          string `proxy:"media,omitempty"`        // lane G: audio (default) | video (higher bitrate)
 	Cover          string `proxy:"cover,omitempty"`        // server-side cover origin; carried in the sub, unused by the client
 	UDP            bool   `proxy:"udp,omitempty"`
 	SkipCertVerify bool   `proxy:"skip-cert-verify,omitempty"`
@@ -142,6 +147,11 @@ func NewLuluTLS(option LuluTLSOption) (*LuluTLS, error) {
 		Shape:       option.Shape,
 		Fingerprint: option.Fingerprint,
 		Arith:       option.Codec == "arith",
+		NoMux:       option.NoMux,
+		Mux:          option.Mux,
+		Window:       option.Window,
+		FrameSize:    option.FrameSize,
+		MediaProfile: option.Media,
 		Insecure:    option.SkipCertVerify,
 		// Dial the node through mihomo's dialer so the socket is marked/bound
 		// (escapes the TUN capture loop) and honours interface / routing-mark.
